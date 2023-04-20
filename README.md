@@ -86,24 +86,21 @@ Allowed values are:
 
 ### Computes a simple ranking
 
-`retweet.py examples\results.json examples\elites.csv
+`retweet.py examples\results.json
 
 ### Computes a weekly ranking
 
-`dendrogram.py examples\results.json examples\elites.csv -g W`
+`retweet.py examples\results.json -g W`
 
 ### Removes all user under 50 points
 
-`dendrogram.py examples\results.json examples\elites.csv -t 50`
+`retweet.py examples\results.json -t 50`
 
-### Compute data from an specific date interval
+### Compute simple ranking and dendrogram
 
-`dendrogram.py  examples/results.json examples\elites.csv -i 2021-10-18,2022-10-18`
+`dendrogram.py  examples/results.json --dendrogram
 
-### Compute data with generic algorithm
+### Compute dendrogram
 
-`dendrogram.py  examples/results.json examples\elites.csv -l generic
+`dendrogram.py  examples/results.json --no-elites --dendrogram
 
-### Compute data with ward method
-
-`dendrogram.py  examples/results.json examples\elites.csv -l ward
