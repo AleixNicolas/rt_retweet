@@ -63,6 +63,7 @@ def main(infile1, infile2, decay, threshold, granularity, interval, alpha, metho
     
     if granularity is not None:
         date_range = pd.date_range(start_time, end_time, freq=granularity)
+        date_range = pd.date_range(start_time, periods =len(date_range)+1, freq=granularity)
         for i in range(len(date_range)-1):
             
             logging.info('Computing at interval '+str(i+1)+'/'+str(len(date_range)))
@@ -74,7 +75,7 @@ def main(infile1, infile2, decay, threshold, granularity, interval, alpha, metho
                     
                 logging.info('Generating connectivity net...')
                 if decay!=1:
-                    connectivity = compute_connectivity(elites, infile1, is_interval, date_range[i+1]-time_delta, date_range[i+1])
+                    connectivity = compute_connectivity(elites, infile1, is_interval, date_range[i+1]-time_delta , date_range[i+1])
                 else:
                     connectivity = compute_connectivity(elites, infile1, is_interval, date_range[0], date_range[i+1])
                 
