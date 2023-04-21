@@ -1,6 +1,5 @@
 import csv
 import json
-import click
 import logging
 import pandas as pd
 import numpy as np
@@ -14,24 +13,23 @@ logging.getLogger().setLevel(logging.INFO)
     
 def main(infile1, infile2, decay, threshold, granularity, interval, alpha, method, algorithm, path):
 
-    # Exceptions for algorithm and method    
-    if algorithm != 'nn_chain' and algorithm != 'generic':
-        raise click.BadOptionUsage('algorithm', 'Non valid algorithm; algorithm must be nn_chain or generic; default is generic')
-        
-    if algorithm == 'generic' and method != 'centroid' and method != 'poldist' and method != 'ward':
-        raise click.BadOptionUsage('method', 'Non valid method; for generic algorithm; method must be poldist, centroid or ward; default is ward')
-
-    if algorithm == 'nn_chain' and method != 'ward':
-        raise click.BadOptionUsage('method', 'Non valid method; for nn_chain algorithm; method must be ward; default is ward')
-    
+    #Opening elites file.
+    logging.info('Opening elites file'+str(infile2))
     f = open(infile2, "r", encoding='cp1252') 
-    csv_file = csv.reader(f)
-    
-    #Check for interval validity
+    csv_file = csv.reader(f)       
+
+    #Determine effective time delta.
+    logging.info('Determining decay time')    
+    if decay !=1:
+        total_seconds = int(-3600*24/(np.log(decay)))
+        time_delta =pd.to_timedelta(total_seconds, unit = 'S')
+        print(time_delta)
+
+    #Determine interval. 
+    logging.info('Determining time interval')
     is_interval = False
     start_time = None
     end_time = None
-
     if interval is not None:
         is_interval = True
         splitted_time = interval.split(',')
@@ -42,14 +40,9 @@ def main(infile1, infile2, decay, threshold, granularity, interval, alpha, metho
             line = next(csv_file)
             start_time = line[2]
             end_time = line[len(line)-1]
-            print(start_time, end_time)
-            
-        
-    if decay !=1:
-        total_seconds = int(-3600*24/(np.log(decay)))
-        time_delta =pd.to_timedelta(total_seconds, unit = 'S')
-        print(time_delta)
-        
+
+    #Determine Threshold
+    logging.info('Determining Threshold')                             
     if threshold is None:
         threshold = 0
         number_of_line = 0
@@ -59,70 +52,60 @@ def main(infile1, infile2, decay, threshold, granularity, interval, alpha, metho
                 threshold = max(threshold, 0.2*sum_score)
             number_of_line += 1
         f.seek(0)
-      
+    logging.info('Threshold = '+str(threshold))
     
+    #Create first temporal file.
+    logging.info('Creating data.csv')
+    data_output = open(path+'/data.csv', 'w', encoding="utf-8")
+    data_output.write("Period,Z,pol\n")
+    
+    logging.info('Computing for each period')
     if granularity is not None:
         date_range = pd.date_range(start_time, end_time, freq=granularity)
         date_range = pd.date_range(start_time, periods =len(date_range)+1, freq=granularity)
         for i in range(len(date_range)-1):
-            
-            logging.info('Computing at interval '+str(i+1)+'/'+str(len(date_range)))
-                 
+            logging.info('Computing at period '+str(i+1)+'/'+str(len(date_range)-1)) 
             logging.info('Filtering users...')
             elites = filter_elites(f, threshold, i)
-            
-            if len(elites) > 1: 
-                    
+            if len(elites) > 5:  
                 logging.info('Generating connectivity net...')
                 if decay!=1:
                     connectivity = compute_connectivity(elites, infile1, is_interval, date_range[i+1]-time_delta , date_range[i+1])
                 else:
                     connectivity = compute_connectivity(elites, infile1, is_interval, date_range[0], date_range[i+1])
-                
                 logging.info('Computing phi and d')          
                 phi, d = compute_phi_d(elites, connectivity)
-                
                 y = ssd.squareform(d)
-                
                 # Call clustering.py with the appropriate algorithm and method.
                 # clustering.py calculates linkage matrix and polarization 
                 logging.info('Computing clusters...')    
                 Z, pol = cl.agglomerative_clustering(y, method = method, alpha = alpha, K=None, verbose = 0, algorithm=algorithm)
                 print(Z)
                 print(pol)
-                
                 logging.info('Plotting dendrogram')  
-                plot_dendrogram(elites, Z, pol, date_range[i+1], path) 
-                
+                plot_dendrogram(elites, Z, pol, date_range[i+1], path)
+                data_output.write(str(date_range[i+1])+','+str(Z.flatten())+','+','+str(pol.flatten())+'\n')
             else:
-                logging.info('Not enough elites.')
-                
+                logging.info('Not enough elites.')            
     else:
         logging.info('Filtering users...')
         elites = filter_elites(f, threshold, 0)
-        
         if len(elites) > 1: 
-            connectivity = compute_connectivity(elites, infile1, is_interval, None, None)
-                
+            connectivity = compute_connectivity(elites, infile1, is_interval, None, None)   
             logging.info('Computing phi and d')          
-            phi, d = compute_phi_d(elites, connectivity)
-                
-            y = ssd.squareform(d)
-                
+            phi, d = compute_phi_d(elites, connectivity)   
+            y = ssd.squareform(d)   
             # Call clustering.py with the appropriate algorithm and method.
             # clustering.py calculates linkage matrix and polarization 
             logging.info('Computing clusters...')    
             Z, pol = cl.agglomerative_clustering(y, method = method, alpha = alpha, K=None, verbose = 0, algorithm=algorithm)
             print(Z)
-            print(pol)
-                
+            print(pol)  
             logging.info('Plotting dendrogram')  
-            plot_dendrogram(elites, Z, pol, 'Accumulated',path) 
-                
+            plot_dendrogram(elites, Z, pol, 'Accumulated',path)  
+            data_output.write(str(date_range[i+1])+','+str(Z.flatten())+','+','+str(pol.flatten())+'\n')
         else:
             logging.info('Not enough elites.')
-                  
-
     infile1.close()
     f.close()
     
